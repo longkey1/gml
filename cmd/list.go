@@ -83,16 +83,36 @@ Examples:
 		// Parse fields
 		fields := parseFields(listFields)
 
+		// Fetch label mappings if we need to resolve or display labels
+		var labelsIndex *labelIndex
+		if len(listLabels) > 0 || fields["labels"] {
+			idx, err := fetchLabelIndex(svc)
+			if err != nil {
+				log.Fatalf("Unable to fetch labels: %v", err)
+			}
+			labelsIndex = idx
+		}
+
 		// Build query
 		query := listQuery
+
+		// Resolve label names to IDs (supports system labels and custom labels)
+		resolvedLabels := listLabels
+		if len(listLabels) > 0 {
+			labels, err := resolveLabelIDs(labelsIndex, listLabels)
+			if err != nil {
+				log.Fatalf("Unable to resolve labels: %v", err)
+			}
+			resolvedLabels = labels
+		}
 
 		// List messages
 		call := svc.Gmail.Users.Messages.List("me").MaxResults(listMaxResults)
 		if query != "" {
 			call = call.Q(query)
 		}
-		if len(listLabels) > 0 {
-			call = call.LabelIds(listLabels...)
+		if len(resolvedLabels) > 0 {
+			call = call.LabelIds(resolvedLabels...)
 		}
 
 		result, err := call.Do()
@@ -131,7 +151,7 @@ Examples:
 				info.ID = msg.Id
 			}
 			if fields["labels"] {
-				info.Labels = msg.LabelIds
+				info.Labels = mapLabelIDsToNames(msg.LabelIds, labelsIndex)
 			}
 			if fields["snippet"] {
 				info.Snippet = msg.Snippet
@@ -180,6 +200,73 @@ func parseFields(fieldsStr string) map[string]bool {
 		fields[strings.TrimSpace(strings.ToLower(f))] = true
 	}
 	return fields
+}
+
+type labelIndex struct {
+	nameToID map[string]string
+	idToName map[string]string
+	idToID   map[string]string
+}
+
+func fetchLabelIndex(svc *gml.Service) (*labelIndex, error) {
+	resp, err := svc.Gmail.Users.Labels.List("me").Do()
+	if err != nil {
+		return nil, fmt.Errorf("unable to list labels: %w", err)
+	}
+
+	nameToID := make(map[string]string)
+	idToName := make(map[string]string)
+	idToID := make(map[string]string)
+	for _, l := range resp.Labels {
+		nameToID[strings.ToLower(l.Name)] = l.Id
+		idToName[strings.ToLower(l.Id)] = l.Name
+		idToID[strings.ToLower(l.Id)] = l.Id
+	}
+
+	return &labelIndex{
+		nameToID: nameToID,
+		idToName: idToName,
+		idToID:   idToID,
+	}, nil
+}
+
+func resolveLabelIDs(idx *labelIndex, requested []string) ([]string, error) {
+	if idx == nil {
+		return nil, fmt.Errorf("label index is nil")
+	}
+
+	var resolved []string
+	for _, raw := range requested {
+		label := strings.ToLower(strings.TrimSpace(raw))
+		if id, ok := idx.nameToID[label]; ok {
+			resolved = append(resolved, id)
+			continue
+		}
+		if id, ok := idx.idToID[label]; ok {
+			resolved = append(resolved, id)
+			continue
+		}
+		return nil, fmt.Errorf("label not found: %s", raw)
+	}
+
+	return resolved, nil
+}
+
+func mapLabelIDsToNames(ids []string, idx *labelIndex) []string {
+	if idx == nil {
+		// Fallback to returning IDs as-is
+		return ids
+	}
+
+	var names []string
+	for _, id := range ids {
+		if name, ok := idx.idToName[strings.ToLower(id)]; ok {
+			names = append(names, name)
+		} else {
+			names = append(names, id)
+		}
+	}
+	return names
 }
 
 func outputJSON(messages []MessageInfo) {

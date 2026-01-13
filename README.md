@@ -61,6 +61,7 @@ gml list -n 20
 # Filter by label
 gml list -l INBOX
 gml list -l INBOX -l UNREAD
+gml list -l "My Project"       # Custom labels resolved by name
 
 # Specify fields to include (available: id,from,to,subject,date,labels,snippet,body)
 gml list -f id,from,subject,body
@@ -76,6 +77,8 @@ Common labels: `INBOX`, `SENT`, `DRAFT`, `SPAM`, `TRASH`, `STARRED`, `UNREAD`, `
 ```bash
 # Get message by ID with full body
 gml get <message-id>
+
+# Labels in output are shown by name (system and custom labels)
 
 # Output as JSON
 gml get <message-id> --format json

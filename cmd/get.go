@@ -64,6 +64,11 @@ Examples:
 			log.Fatalf("Unable to create service: %v", err)
 		}
 
+		labelsIndex, err := fetchLabelIndex(svc)
+		if err != nil {
+			log.Fatalf("Unable to fetch labels: %v", err)
+		}
+
 		msg, err := svc.Gmail.Users.Messages.Get("me", messageID).Format("full").Do()
 		if err != nil {
 			log.Fatalf("Unable to retrieve message: %v", err)
@@ -71,7 +76,7 @@ Examples:
 
 		detail := MessageDetail{
 			ID:     msg.Id,
-			Labels: msg.LabelIds,
+			Labels: mapLabelIDsToNames(msg.LabelIds, labelsIndex),
 		}
 
 		for _, header := range msg.Payload.Headers {
