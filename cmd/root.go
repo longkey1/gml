@@ -80,5 +80,8 @@ func initConfig() {
 
 // GetConfig returns the loaded configuration
 func GetConfig() *gml.Config {
+	if config == nil {
+		log.Fatal("Config file not found. Please create a config file at $HOME/.config/gml/config.toml")
+	}
 	return config
 }
