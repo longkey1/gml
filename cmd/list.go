@@ -20,9 +20,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	"strings"
 
 	"github.com/longkey1/gml/internal/gml"
+	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 	"google.golang.org/api/gmail/v1"
 )
@@ -30,9 +32,9 @@ import (
 var (
 	listQuery      string
 	listMaxResults int64
-	listUnread     bool
 	listFormat     string
 	listFields     string
+	listLabels     []string
 )
 
 const defaultFields = "id,from,subject,date,labels,snippet"
@@ -57,11 +59,16 @@ var listCmd = &cobra.Command{
 
 Available fields: id, from, to, subject, date, labels, snippet, body
 
+Common labels: INBOX, SENT, DRAFT, SPAM, TRASH, STARRED, UNREAD, IMPORTANT,
+               CATEGORY_PERSONAL, CATEGORY_SOCIAL, CATEGORY_PROMOTIONS,
+               CATEGORY_UPDATES, CATEGORY_FORUMS
+
 Examples:
   gml list                              # List recent messages
-  gml list -u                           # List unread messages
   gml list -q "from:example@gmail.com"  # Search messages
   gml list -n 20                        # Get 20 messages
+  gml list -l INBOX                     # List messages in INBOX
+  gml list -l INBOX -l UNREAD           # List unread messages in INBOX
   gml list -f id,from,subject,body      # Specify fields to include
   gml list --format json                # Output as JSON`,
 	Run: func(cmd *cobra.Command, args []string) {
@@ -78,18 +85,14 @@ Examples:
 
 		// Build query
 		query := listQuery
-		if listUnread {
-			if query != "" {
-				query = query + " is:unread"
-			} else {
-				query = "is:unread"
-			}
-		}
 
 		// List messages
 		call := svc.Gmail.Users.Messages.List("me").MaxResults(listMaxResults)
 		if query != "" {
 			call = call.Q(query)
+		}
+		if len(listLabels) > 0 {
+			call = call.LabelIds(listLabels...)
 		}
 
 		result, err := call.Do()
@@ -188,34 +191,61 @@ func outputJSON(messages []MessageInfo) {
 }
 
 func outputText(messages []MessageInfo, fields map[string]bool) {
-	for _, msg := range messages {
-		if fields["id"] {
-			fmt.Printf("ID: %s\n", msg.ID)
+	// Build header based on selected fields
+	var headers []any
+	fieldOrder := []string{"id", "from", "to", "subject", "date", "labels", "snippet"}
+	for _, f := range fieldOrder {
+		if fields[f] {
+			headers = append(headers, strings.ToUpper(f))
 		}
-		if fields["from"] {
-			fmt.Printf("From: %s\n", msg.From)
-		}
-		if fields["to"] {
-			fmt.Printf("To: %s\n", msg.To)
-		}
-		if fields["subject"] {
-			fmt.Printf("Subject: %s\n", msg.Subject)
-		}
-		if fields["date"] {
-			fmt.Printf("Date: %s\n", msg.Date)
-		}
-		if fields["labels"] && len(msg.Labels) > 0 {
-			fmt.Printf("Labels: %s\n", strings.Join(msg.Labels, ", "))
-		}
-		if fields["snippet"] && msg.Snippet != "" {
-			fmt.Printf("Snippet: %s\n", msg.Snippet)
-		}
-		if fields["body"] && msg.Body != "" {
-			fmt.Println("---")
-			fmt.Println(msg.Body)
-		}
-		fmt.Println("---")
 	}
+
+	table := tablewriter.NewWriter(os.Stdout)
+	table.Header(headers...)
+
+	for _, msg := range messages {
+		var row []any
+		for _, f := range fieldOrder {
+			if !fields[f] {
+				continue
+			}
+			switch f {
+			case "id":
+				row = append(row, msg.ID)
+			case "from":
+				row = append(row, truncate(msg.From, 30))
+			case "to":
+				row = append(row, truncate(msg.To, 30))
+			case "subject":
+				row = append(row, truncate(msg.Subject, 40))
+			case "date":
+				row = append(row, msg.Date)
+			case "labels":
+				row = append(row, strings.Join(msg.Labels, ", "))
+			case "snippet":
+				row = append(row, truncate(msg.Snippet, 50))
+			}
+		}
+		table.Append(row)
+	}
+
+	table.Render()
+
+	// Print body separately if requested
+	if fields["body"] {
+		for _, msg := range messages {
+			if msg.Body != "" {
+				fmt.Printf("\n=== %s ===\n%s\n", msg.ID, msg.Body)
+			}
+		}
+	}
+}
+
+func truncate(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen-3] + "..."
 }
 
 func init() {
@@ -223,7 +253,7 @@ func init() {
 
 	listCmd.Flags().StringVarP(&listQuery, "query", "q", "", "Search query (Gmail search syntax)")
 	listCmd.Flags().Int64VarP(&listMaxResults, "max-results", "n", 10, "Maximum number of messages to return")
-	listCmd.Flags().BoolVarP(&listUnread, "unread", "u", false, "Show only unread messages")
+	listCmd.Flags().StringArrayVarP(&listLabels, "label", "l", nil, "Filter by label (can be specified multiple times)")
 	listCmd.Flags().StringVar(&listFormat, "format", "text", "Output format (text or json)")
 	listCmd.Flags().StringVarP(&listFields, "fields", "f", defaultFields, "Comma-separated list of fields (id,from,to,subject,date,labels,snippet,body)")
 }

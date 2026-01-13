@@ -52,14 +52,15 @@ This will open your browser for Google OAuth authentication.
 # List recent messages
 gml list
 
-# List unread messages
-gml list -u
-
 # Search messages
 gml list -q "from:example@gmail.com"
 
 # Limit results
 gml list -n 20
+
+# Filter by label
+gml list -l INBOX
+gml list -l INBOX -l UNREAD
 
 # Specify fields to include (available: id,from,to,subject,date,labels,snippet,body)
 gml list -f id,from,subject,body
@@ -67,6 +68,8 @@ gml list -f id,from,subject,body
 # Output as JSON
 gml list --format json
 ```
+
+Common labels: `INBOX`, `SENT`, `DRAFT`, `SPAM`, `TRASH`, `STARRED`, `UNREAD`, `IMPORTANT`, `CATEGORY_PERSONAL`, `CATEGORY_SOCIAL`, `CATEGORY_PROMOTIONS`, `CATEGORY_UPDATES`, `CATEGORY_FORUMS`
 
 ### Get Message
 
