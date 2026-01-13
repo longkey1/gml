@@ -61,8 +61,21 @@ gml list -q "from:example@gmail.com"
 # Limit results
 gml list -n 20
 
+# Specify fields to include (available: id,from,to,subject,date,labels,snippet,body)
+gml list -f id,from,subject,body
+
 # Output as JSON
 gml list --format json
+```
+
+### Get Message
+
+```bash
+# Get message by ID with full body
+gml get <message-id>
+
+# Output as JSON
+gml get <message-id> --format json
 ```
 
 ### Version

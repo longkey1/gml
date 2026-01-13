@@ -24,6 +24,7 @@ import (
 
 	"github.com/longkey1/gml/internal/gml"
 	"github.com/spf13/cobra"
+	"google.golang.org/api/gmail/v1"
 )
 
 var (
@@ -31,16 +32,21 @@ var (
 	listMaxResults int64
 	listUnread     bool
 	listFormat     string
+	listFields     string
 )
+
+const defaultFields = "id,from,subject,date,labels,snippet"
 
 // MessageInfo represents a simplified message for output
 type MessageInfo struct {
-	ID      string   `json:"id"`
-	From    string   `json:"from"`
-	Subject string   `json:"subject"`
-	Date    string   `json:"date"`
-	Snippet string   `json:"snippet"`
-	Labels  []string `json:"labels"`
+	ID      string   `json:"id,omitempty"`
+	From    string   `json:"from,omitempty"`
+	To      string   `json:"to,omitempty"`
+	Subject string   `json:"subject,omitempty"`
+	Date    string   `json:"date,omitempty"`
+	Snippet string   `json:"snippet,omitempty"`
+	Labels  []string `json:"labels,omitempty"`
+	Body    string   `json:"body,omitempty"`
 }
 
 // listCmd represents the list command
@@ -49,12 +55,15 @@ var listCmd = &cobra.Command{
 	Short: "List Gmail messages",
 	Long: `List Gmail messages with optional filters.
 
+Available fields: id, from, to, subject, date, labels, snippet, body
+
 Examples:
-  gml list                      # List recent messages
-  gml list -u                   # List unread messages
+  gml list                              # List recent messages
+  gml list -u                           # List unread messages
   gml list -q "from:example@gmail.com"  # Search messages
-  gml list -n 20                # Get 20 messages
-  gml list --format json        # Output as JSON`,
+  gml list -n 20                        # Get 20 messages
+  gml list -f id,from,subject,body      # Specify fields to include
+  gml list --format json                # Output as JSON`,
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
 		cfg := GetConfig()
@@ -63,6 +72,9 @@ Examples:
 		if err != nil {
 			log.Fatalf("Unable to create service: %v", err)
 		}
+
+		// Parse fields
+		fields := parseFields(listFields)
 
 		// Build query
 		query := listQuery
@@ -90,31 +102,61 @@ Examples:
 			return
 		}
 
+		// Determine if we need full format (for body)
+		needsBody := fields["body"]
+
 		// Get message details
 		var messages []MessageInfo
 		for _, m := range result.Messages {
-			msg, err := svc.Gmail.Users.Messages.Get("me", m.Id).Format("metadata").
-				MetadataHeaders("From", "Subject", "Date").Do()
+			var msg *gmail.Message
+			var err error
+
+			if needsBody {
+				msg, err = svc.Gmail.Users.Messages.Get("me", m.Id).Format("full").Do()
+			} else {
+				msg, err = svc.Gmail.Users.Messages.Get("me", m.Id).Format("metadata").
+					MetadataHeaders("From", "To", "Subject", "Date").Do()
+			}
 			if err != nil {
 				log.Printf("Unable to retrieve message %s: %v", m.Id, err)
 				continue
 			}
 
-			info := MessageInfo{
-				ID:      msg.Id,
-				Snippet: msg.Snippet,
-				Labels:  msg.LabelIds,
+			info := MessageInfo{}
+
+			if fields["id"] {
+				info.ID = msg.Id
+			}
+			if fields["labels"] {
+				info.Labels = msg.LabelIds
+			}
+			if fields["snippet"] {
+				info.Snippet = msg.Snippet
 			}
 
 			for _, header := range msg.Payload.Headers {
 				switch header.Name {
 				case "From":
-					info.From = header.Value
+					if fields["from"] {
+						info.From = header.Value
+					}
+				case "To":
+					if fields["to"] {
+						info.To = header.Value
+					}
 				case "Subject":
-					info.Subject = header.Value
+					if fields["subject"] {
+						info.Subject = header.Value
+					}
 				case "Date":
-					info.Date = header.Value
+					if fields["date"] {
+						info.Date = header.Value
+					}
 				}
+			}
+
+			if needsBody {
+				info.Body = extractBody(msg.Payload)
 			}
 
 			messages = append(messages, info)
@@ -124,9 +166,17 @@ Examples:
 		if listFormat == "json" {
 			outputJSON(messages)
 		} else {
-			outputText(messages)
+			outputText(messages, fields)
 		}
 	},
+}
+
+func parseFields(fieldsStr string) map[string]bool {
+	fields := make(map[string]bool)
+	for _, f := range strings.Split(fieldsStr, ",") {
+		fields[strings.TrimSpace(strings.ToLower(f))] = true
+	}
+	return fields
 }
 
 func outputJSON(messages []MessageInfo) {
@@ -137,16 +187,33 @@ func outputJSON(messages []MessageInfo) {
 	fmt.Println(string(data))
 }
 
-func outputText(messages []MessageInfo) {
+func outputText(messages []MessageInfo, fields map[string]bool) {
 	for _, msg := range messages {
-		fmt.Printf("ID: %s\n", msg.ID)
-		fmt.Printf("From: %s\n", msg.From)
-		fmt.Printf("Subject: %s\n", msg.Subject)
-		fmt.Printf("Date: %s\n", msg.Date)
-		if len(msg.Labels) > 0 {
+		if fields["id"] {
+			fmt.Printf("ID: %s\n", msg.ID)
+		}
+		if fields["from"] {
+			fmt.Printf("From: %s\n", msg.From)
+		}
+		if fields["to"] {
+			fmt.Printf("To: %s\n", msg.To)
+		}
+		if fields["subject"] {
+			fmt.Printf("Subject: %s\n", msg.Subject)
+		}
+		if fields["date"] {
+			fmt.Printf("Date: %s\n", msg.Date)
+		}
+		if fields["labels"] && len(msg.Labels) > 0 {
 			fmt.Printf("Labels: %s\n", strings.Join(msg.Labels, ", "))
 		}
-		fmt.Printf("Snippet: %s\n", msg.Snippet)
+		if fields["snippet"] && msg.Snippet != "" {
+			fmt.Printf("Snippet: %s\n", msg.Snippet)
+		}
+		if fields["body"] && msg.Body != "" {
+			fmt.Println("---")
+			fmt.Println(msg.Body)
+		}
 		fmt.Println("---")
 	}
 }
@@ -158,4 +225,5 @@ func init() {
 	listCmd.Flags().Int64VarP(&listMaxResults, "max-results", "n", 10, "Maximum number of messages to return")
 	listCmd.Flags().BoolVarP(&listUnread, "unread", "u", false, "Show only unread messages")
 	listCmd.Flags().StringVar(&listFormat, "format", "text", "Output format (text or json)")
+	listCmd.Flags().StringVarP(&listFields, "fields", "f", defaultFields, "Comma-separated list of fields (id,from,to,subject,date,labels,snippet,body)")
 }
