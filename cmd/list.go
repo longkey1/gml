@@ -106,21 +106,36 @@ Examples:
 			resolvedLabels = labels
 		}
 
-		// List messages
-		call := svc.Gmail.Users.Messages.List("me").MaxResults(listMaxResults)
-		if query != "" {
-			call = call.Q(query)
-		}
-		if len(resolvedLabels) > 0 {
-			call = call.LabelIds(resolvedLabels...)
+		// List messages with pagination
+		var allMessages []*gmail.Message
+		pageToken := ""
+
+		for {
+			call := svc.Gmail.Users.Messages.List("me").MaxResults(listMaxResults)
+			if query != "" {
+				call = call.Q(query)
+			}
+			if len(resolvedLabels) > 0 {
+				call = call.LabelIds(resolvedLabels...)
+			}
+			if pageToken != "" {
+				call = call.PageToken(pageToken)
+			}
+
+			result, err := call.Do()
+			if err != nil {
+				log.Fatalf("Unable to retrieve messages: %v", err)
+			}
+
+			allMessages = append(allMessages, result.Messages...)
+
+			if result.NextPageToken == "" {
+				break
+			}
+			pageToken = result.NextPageToken
 		}
 
-		result, err := call.Do()
-		if err != nil {
-			log.Fatalf("Unable to retrieve messages: %v", err)
-		}
-
-		if len(result.Messages) == 0 {
+		if len(allMessages) == 0 {
 			fmt.Println("No messages found.")
 			return
 		}
@@ -130,7 +145,7 @@ Examples:
 
 		// Get message details
 		var messages []MessageInfo
-		for _, m := range result.Messages {
+		for _, m := range allMessages {
 			var msg *gmail.Message
 			var err error
 

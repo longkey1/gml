@@ -55,8 +55,8 @@ gml list
 # Search messages
 gml list -q "from:example@gmail.com"
 
-# Limit results
-gml list -n 20
+# Set page size (automatically fetches all pages)
+gml list -n 100
 
 # Filter by label
 gml list -l INBOX
@@ -71,6 +71,8 @@ gml list --format json
 ```
 
 Common labels: `INBOX`, `SENT`, `DRAFT`, `SPAM`, `TRASH`, `STARRED`, `UNREAD`, `IMPORTANT`, `CATEGORY_PERSONAL`, `CATEGORY_SOCIAL`, `CATEGORY_PROMOTIONS`, `CATEGORY_UPDATES`, `CATEGORY_FORUMS`
+
+Note: The list command automatically fetches all matching messages using pagination. The `-n` option sets the page size per API request (default: 10, max: 500).
 
 ### Get Message
 
