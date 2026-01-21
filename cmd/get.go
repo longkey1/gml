@@ -34,13 +34,15 @@ var (
 
 // MessageDetail represents a full message with body for output
 type MessageDetail struct {
-	ID      string   `json:"id"`
-	From    string   `json:"from"`
-	To      string   `json:"to"`
-	Subject string   `json:"subject"`
-	Date    string   `json:"date"`
-	Labels  []string `json:"labels"`
-	Body    string   `json:"body"`
+	ID       string   `json:"id"`
+	ThreadID string   `json:"threadId"`
+	URL      string   `json:"url"`
+	From     string   `json:"from"`
+	To       string   `json:"to"`
+	Subject  string   `json:"subject"`
+	Date     string   `json:"date"`
+	Labels   []string `json:"labels"`
+	Body     string   `json:"body"`
 }
 
 // getCmd represents the get command
@@ -64,6 +66,11 @@ Examples:
 			log.Fatalf("Unable to create service: %v", err)
 		}
 
+		profile, err := svc.Gmail.Users.GetProfile("me").Do()
+		if err != nil {
+			log.Fatalf("Unable to get user profile: %v", err)
+		}
+
 		labelsIndex, err := fetchLabelIndex(svc)
 		if err != nil {
 			log.Fatalf("Unable to fetch labels: %v", err)
@@ -75,8 +82,10 @@ Examples:
 		}
 
 		detail := MessageDetail{
-			ID:     msg.Id,
-			Labels: mapLabelIDsToNames(msg.LabelIds, labelsIndex),
+			ID:       msg.Id,
+			ThreadID: msg.ThreadId,
+			URL:      buildMailURL(profile.EmailAddress, msg.ThreadId),
+			Labels:   mapLabelIDsToNames(msg.LabelIds, labelsIndex),
 		}
 
 		for _, header := range msg.Payload.Headers {
@@ -161,6 +170,8 @@ func outputDetailJSON(detail MessageDetail) {
 
 func outputDetailText(detail MessageDetail) {
 	fmt.Printf("ID: %s\n", detail.ID)
+	fmt.Printf("ThreadID: %s\n", detail.ThreadID)
+	fmt.Printf("URL: %s\n", detail.URL)
 	fmt.Printf("From: %s\n", detail.From)
 	fmt.Printf("To: %s\n", detail.To)
 	fmt.Printf("Subject: %s\n", detail.Subject)

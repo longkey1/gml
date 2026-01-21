@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/url"
 	"os"
 	"strings"
 
@@ -41,14 +42,16 @@ const defaultFields = "id,from,subject,date,labels,snippet"
 
 // MessageInfo represents a simplified message for output
 type MessageInfo struct {
-	ID      string   `json:"id,omitempty"`
-	From    string   `json:"from,omitempty"`
-	To      string   `json:"to,omitempty"`
-	Subject string   `json:"subject,omitempty"`
-	Date    string   `json:"date,omitempty"`
-	Snippet string   `json:"snippet,omitempty"`
-	Labels  []string `json:"labels,omitempty"`
-	Body    string   `json:"body,omitempty"`
+	ID       string   `json:"id,omitempty"`
+	ThreadID string   `json:"threadId,omitempty"`
+	URL      string   `json:"url,omitempty"`
+	From     string   `json:"from,omitempty"`
+	To       string   `json:"to,omitempty"`
+	Subject  string   `json:"subject,omitempty"`
+	Date     string   `json:"date,omitempty"`
+	Snippet  string   `json:"snippet,omitempty"`
+	Labels   []string `json:"labels,omitempty"`
+	Body     string   `json:"body,omitempty"`
 }
 
 // listCmd represents the list command
@@ -57,7 +60,7 @@ var listCmd = &cobra.Command{
 	Short: "List Gmail messages",
 	Long: `List Gmail messages with optional filters.
 
-Available fields: id, from, to, subject, date, labels, snippet, body
+Available fields: id, threadid, url, from, to, subject, date, labels, snippet, body
 
 Common labels: INBOX, SENT, DRAFT, SPAM, TRASH, STARRED, UNREAD, IMPORTANT,
                CATEGORY_PERSONAL, CATEGORY_SOCIAL, CATEGORY_PROMOTIONS,
@@ -82,6 +85,16 @@ Examples:
 
 		// Parse fields
 		fields := parseFields(listFields)
+
+		// Fetch user email if URL field is requested
+		var userEmail string
+		if fields["url"] {
+			profile, err := svc.Gmail.Users.GetProfile("me").Do()
+			if err != nil {
+				log.Fatalf("Unable to get user profile: %v", err)
+			}
+			userEmail = profile.EmailAddress
+		}
 
 		// Fetch label mappings if we need to resolve or display labels
 		var labelsIndex *labelIndex
@@ -164,6 +177,12 @@ Examples:
 
 			if fields["id"] {
 				info.ID = msg.Id
+			}
+			if fields["threadid"] {
+				info.ThreadID = msg.ThreadId
+			}
+			if fields["url"] {
+				info.URL = buildMailURL(userEmail, msg.ThreadId)
 			}
 			if fields["labels"] {
 				info.Labels = mapLabelIDsToNames(msg.LabelIds, labelsIndex)
@@ -295,7 +314,7 @@ func outputJSON(messages []MessageInfo) {
 func outputText(messages []MessageInfo, fields map[string]bool) {
 	// Build header based on selected fields
 	var headers []any
-	fieldOrder := []string{"id", "from", "to", "subject", "date", "labels", "snippet"}
+	fieldOrder := []string{"id", "threadid", "url", "from", "to", "subject", "date", "labels", "snippet"}
 	for _, f := range fieldOrder {
 		if fields[f] {
 			headers = append(headers, strings.ToUpper(f))
@@ -314,6 +333,10 @@ func outputText(messages []MessageInfo, fields map[string]bool) {
 			switch f {
 			case "id":
 				row = append(row, msg.ID)
+			case "threadid":
+				row = append(row, msg.ThreadID)
+			case "url":
+				row = append(row, msg.URL)
 			case "from":
 				row = append(row, truncate(msg.From, 30))
 			case "to":
@@ -348,6 +371,11 @@ func truncate(s string, maxLen int) string {
 		return s
 	}
 	return s[:maxLen-3] + "..."
+}
+
+func buildMailURL(email, threadID string) string {
+	return fmt.Sprintf("https://mail.google.com/mail/?authuser=%s#all/%s",
+		url.QueryEscape(email), threadID)
 }
 
 func init() {
