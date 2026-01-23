@@ -17,7 +17,6 @@ package cmd
 
 import (
 	"fmt"
-	"log"
 	"os"
 
 	"github.com/longkey1/gml/internal/gml"
@@ -32,39 +31,43 @@ var authCmd = &cobra.Command{
 	Long: `Authenticate with Gmail API using OAuth.
 This command initiates the OAuth flow to obtain and save access tokens.
 Only applicable when auth_type is set to "oauth" in config.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		cfg := GetConfig()
+	RunE: runAuth,
+}
 
-		if cfg.AuthType != gml.AuthTypeOAuth {
-			log.Fatalf("auth command is only available for OAuth authentication (current: %s)", cfg.AuthType)
+func runAuth(cmd *cobra.Command, args []string) error {
+	cfg := GetConfig()
+
+	if cfg.AuthType != gml.AuthTypeOAuth {
+		return fmt.Errorf("auth command is only available for OAuth authentication (current: %s)", cfg.AuthType)
+	}
+
+	// Check if token already exists
+	if _, err := os.Stat(cfg.GoogleUserCredentials); err == nil {
+		fmt.Fprintf(cmd.OutOrStdout(), "Token file already exists: %s\n", cfg.GoogleUserCredentials)
+		fmt.Fprint(cmd.OutOrStdout(), "Do you want to re-authenticate? [y/N]: ")
+		var response string
+		fmt.Scanln(&response)
+		if response != "y" && response != "Y" {
+			fmt.Fprintln(cmd.OutOrStdout(), "Cancelled.")
+			return nil
 		}
+	}
 
-		// Check if token already exists
-		if _, err := os.Stat(cfg.GoogleUserCredentials); err == nil {
-			fmt.Printf("Token file already exists: %s\n", cfg.GoogleUserCredentials)
-			fmt.Print("Do you want to re-authenticate? [y/N]: ")
-			var response string
-			fmt.Scanln(&response)
-			if response != "y" && response != "Y" {
-				fmt.Println("Cancelled.")
-				return
-			}
-		}
+	// Run OAuth flow
+	auth := google.NewOAuthAuthenticator(
+		cfg.GoogleApplicationCredentials,
+		cfg.GoogleUserCredentials,
+	)
 
-		// Run OAuth flow
-		auth := google.NewOAuthAuthenticator(
-			cfg.GoogleApplicationCredentials,
-			cfg.GoogleUserCredentials,
-		)
+	if err := auth.Authenticate(); err != nil {
+		return fmt.Errorf("authentication failed: %w", err)
+	}
 
-		if err := auth.Authenticate(); err != nil {
-			log.Fatalf("Authentication failed: %v", err)
-		}
-
-		fmt.Println("Authentication successful!")
-	},
+	fmt.Fprintln(cmd.OutOrStdout(), "Authentication successful!")
+	return nil
 }
 
 func init() {
 	rootCmd.AddCommand(authCmd)
+	authCmd.SetOut(os.Stdout)
 }

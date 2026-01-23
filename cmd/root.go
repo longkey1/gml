@@ -16,7 +16,7 @@ limitations under the License.
 package cmd
 
 import (
-	"log"
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -34,12 +34,19 @@ var (
 var rootCmd = &cobra.Command{
 	Use:   "gml",
 	Short: "Gmail cli client",
+	// SilenceErrors allows us to handle errors gracefully without cobra printing them twice
+	SilenceErrors: true,
+	// SilenceUsage prevents usage from being printed on every error
+	SilenceUsage: true,
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
-	cobra.CheckErr(rootCmd.Execute())
+	if err := rootCmd.Execute(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
 }
 
 func init() {
@@ -66,7 +73,8 @@ func initConfig() {
 	// Config file is optional for some commands (e.g., version)
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
-			log.Fatalf("Unable to read config file, %v", err)
+			// Only fail if it's not a "file not found" error
+			cobra.CheckErr(fmt.Errorf("unable to read config file: %w", err))
 		}
 		return
 	}
@@ -74,14 +82,16 @@ func initConfig() {
 	var err error
 	config, err = gml.LoadConfig()
 	if err != nil {
-		log.Fatalf("Unable to load config: %v", err)
+		cobra.CheckErr(fmt.Errorf("unable to load config: %w", err))
 	}
 }
 
 // GetConfig returns the loaded configuration
+// This function will panic if called before config is loaded, but that's intentional
+// as commands requiring config should only run after initConfig
 func GetConfig() *gml.Config {
 	if config == nil {
-		log.Fatal("Config file not found. Please create a config file at $HOME/.config/gml/config.toml")
+		cobra.CheckErr(fmt.Errorf("config file not found. Please create a config file at $HOME/.config/gml/config.toml"))
 	}
 	return config
 }
