@@ -2,8 +2,25 @@
 /bin/
 /dist/
 
-# Dependency directories
-/vendor/
+# Executables
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary
+*.test
+
+# Go workspace
+go.work
+go.work.sum
+vendor/
+
+# Environment
+.env
+.envrc
+.direnv/
 
 # Cache
 /.cache/
@@ -17,8 +34,3 @@
 # OS
 .DS_Store
 Thumbs.db
-
-# Environment files
-.envrc
-.env
-.env.local
