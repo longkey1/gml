@@ -278,6 +278,21 @@ func findBodyPart(part *gmail.MessagePart, mimeType string) string {
 	return ""
 }
 
+// ModifyMessage modifies a message's labels using the Gmail API
+func ModifyMessage(ctx context.Context, svc *Service, messageID string, addLabelIDs, removeLabelIDs []string) error {
+	req := &gmail.ModifyMessageRequest{
+		AddLabelIds:    addLabelIDs,
+		RemoveLabelIds: removeLabelIDs,
+	}
+
+	_, err := svc.Gmail.Users.Messages.Modify("me", messageID, req).Context(ctx).Do()
+	if err != nil {
+		return fmt.Errorf("unable to modify message: %w", err)
+	}
+
+	return nil
+}
+
 // ParseFields parses a comma-separated field string into a map
 func ParseFields(fieldsStr string) map[string]bool {
 	fields := make(map[string]bool)

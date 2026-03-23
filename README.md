@@ -86,6 +86,27 @@ gml get <message-id>
 gml get <message-id> --format json
 ```
 
+### Modify Message
+
+```bash
+# Mark as read
+gml modify <message-id> --read
+
+# Mark as unread
+gml modify <message-id> --unread
+
+# Archive message (remove from inbox)
+gml modify <message-id> --archive
+
+# Move back to inbox
+gml modify <message-id> --unarchive
+
+# Combine multiple operations
+gml modify <message-id> --read --archive
+```
+
+> **Note:** The modify command requires the Gmail modify scope. If you previously authenticated with read-only scope, you need to re-authenticate by running `gml auth`.
+
 ### Version
 
 ```bash

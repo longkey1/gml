@@ -67,6 +67,7 @@ gml/
 │   ├── auth.go            # OAuth authentication command
 │   ├── list.go            # List messages command (delegates to internal/gml)
 │   ├── get.go             # Get message command (delegates to internal/gml)
+│   ├── modify.go          # Modify message command (delegates to internal/gml)
 │   └── version.go         # Version command
 ├── internal/
 │   ├── gml/               # Core application logic
@@ -89,7 +90,7 @@ The application supports two authentication methods:
 1. **OAuth2** (default): Interactive browser-based authentication
    - Runs a local HTTP server on a random port to receive the OAuth callback
    - Stores token in `user_credentials` path (default: `~/.config/gml/token.json`)
-   - Uses `gmail.GmailReadonlyScope` (read-only access)
+   - Uses `gmail.GmailModifyScope` (read and modify access)
 
 2. **Service Account**: For server-side or automated use
    - Sets `GOOGLE_APPLICATION_CREDENTIALS` environment variable
@@ -135,6 +136,7 @@ Business logic is separated into focused modules in `internal/gml/`:
 - **messages.go**:
   - `ListMessages()`: Fetches messages with pagination, supports query, labels, field filtering
   - `GetMessage()`: Retrieves a single message by ID with full details
+  - `ModifyMessage()`: Modifies a message's labels (add/remove) via Gmail API
   - `ParseFields()`: Parses comma-separated field strings
   - Body extraction with MIME type handling (text/plain, text/html)
 
@@ -168,7 +170,7 @@ In development builds, defaults to "dev" / "unknown".
 
 ## Development Notes
 
-- The application uses read-only Gmail scope (`GmailReadonlyScope`)
+- The application uses Gmail modify scope (`GmailModifyScope`) for read and write access
 - OAuth callback uses a dynamically allocated port to avoid conflicts
 - Cross-platform browser launching is handled in `openBrowser()` (Darwin, Linux, Windows)
 - All API interactions are context-aware for proper cancellation and timeouts
