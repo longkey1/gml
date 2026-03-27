@@ -51,7 +51,19 @@ func (a *OAuthAuthenticator) GetClient(ctx context.Context) (*http.Client, error
 		return nil, fmt.Errorf("token not found, please run 'gml auth' first: %v", err)
 	}
 
-	return config.Client(ctx, token), nil
+	tokenSource := config.TokenSource(ctx, token)
+	newToken, err := tokenSource.Token()
+	if err != nil {
+		return nil, fmt.Errorf("unable to refresh token, please run 'gml auth' again: %v", err)
+	}
+
+	if newToken.AccessToken != token.AccessToken {
+		if err := a.saveToken(newToken); err != nil {
+			return nil, fmt.Errorf("unable to save refreshed token: %v", err)
+		}
+	}
+
+	return oauth2.NewClient(ctx, tokenSource), nil
 }
 
 func (a *OAuthAuthenticator) tokenFromFile() (*oauth2.Token, error) {
@@ -67,7 +79,6 @@ func (a *OAuthAuthenticator) tokenFromFile() (*oauth2.Token, error) {
 }
 
 func (a *OAuthAuthenticator) saveToken(token *oauth2.Token) error {
-	fmt.Printf("Saving credential file to: %s\n", a.tokenFile)
 	f, err := os.Create(a.tokenFile)
 	if err != nil {
 		return fmt.Errorf("unable to cache oauth token: %v", err)
