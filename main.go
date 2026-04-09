@@ -15,20 +15,8 @@ limitations under the License.
 */
 package main
 
-import (
-	"github.com/longkey1/gml/cmd"
-	"github.com/longkey1/gml/internal/version"
-)
-
-var (
-	ver    = "dev"
-	commit = "unknown"
-	date   = "unknown"
-)
+import "github.com/longkey1/gml/cmd"
 
 func main() {
-	version.Version = ver
-	version.CommitSHA = commit
-	version.BuildTime = date
 	cmd.Execute()
 }
