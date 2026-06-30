@@ -101,8 +101,22 @@ gml modify <message-id> --archive
 # Move back to inbox
 gml modify <message-id> --unarchive
 
+# Add a custom label (use "/" for hierarchical labels, quote if it contains spaces)
+gml modify <message-id> --add-label MyLabel
+gml modify <message-id> --add-label "Parent/Child"
+gml modify <message-id> --add-label "Work/Project Alpha"
+
+# Add multiple labels (comma-separated or repeated flag)
+gml modify <message-id> --add-label Label1,Label2
+gml modify <message-id> --add-label Label1 --add-label Label2
+
+# Remove a label
+gml modify <message-id> --remove-label MyLabel
+gml modify <message-id> --remove-label "Parent/Child"
+
 # Combine multiple operations
 gml modify <message-id> --read --archive
+gml modify <message-id> --read --add-label MyLabel
 ```
 
 > **Note:** The modify command requires the Gmail modify scope. If you previously authenticated with read-only scope, you need to re-authenticate by running `gml auth`.

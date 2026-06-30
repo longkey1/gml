@@ -32,11 +32,14 @@ var modifyCmd = &cobra.Command{
 Supports marking messages as read/unread and archiving/unarchiving.
 
 Examples:
-  gml modify 18abc123def456 --read        # Mark as read
-  gml modify 18abc123def456 --unread      # Mark as unread
-  gml modify 18abc123def456 --archive     # Archive message
-  gml modify 18abc123def456 --unarchive   # Move back to inbox
-  gml modify 18abc123def456 --read --archive  # Read and archive`,
+  gml modify 18abc123def456 --read                        # Mark as read
+  gml modify 18abc123def456 --unread                      # Mark as unread
+  gml modify 18abc123def456 --archive                     # Archive message
+  gml modify 18abc123def456 --unarchive                   # Move back to inbox
+  gml modify 18abc123def456 --read --archive              # Read and archive
+  gml modify 18abc123def456 --add-label MyLabel           # Add a custom label
+  gml modify 18abc123def456 --remove-label MyLabel        # Remove a custom label
+  gml modify 18abc123def456 --add-label Label1,Label2     # Add multiple labels`,
 	Args: cobra.ExactArgs(1),
 	RunE: runModify,
 }
@@ -51,6 +54,8 @@ func runModify(cmd *cobra.Command, args []string) error {
 	unread, _ := cmd.Flags().GetBool("unread")
 	archive, _ := cmd.Flags().GetBool("archive")
 	unarchive, _ := cmd.Flags().GetBool("unarchive")
+	addLabels, _ := cmd.Flags().GetStringSlice("add-label")
+	removeLabels, _ := cmd.Flags().GetStringSlice("remove-label")
 
 	// Validate conflicting flags
 	if read && unread {
@@ -61,8 +66,8 @@ func runModify(cmd *cobra.Command, args []string) error {
 	}
 
 	// Validate at least one flag is specified
-	if !read && !unread && !archive && !unarchive {
-		return fmt.Errorf("at least one of --read, --unread, --archive, --unarchive must be specified")
+	if !read && !unread && !archive && !unarchive && len(addLabels) == 0 && len(removeLabels) == 0 {
+		return fmt.Errorf("at least one of --read, --unread, --archive, --unarchive, --add-label, --remove-label must be specified")
 	}
 
 	// Build label modifications
@@ -87,6 +92,28 @@ func runModify(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("unable to create service: %w", err)
 	}
 
+	// Resolve custom label names to IDs if needed
+	if len(addLabels) > 0 || len(removeLabels) > 0 {
+		labelIndex, err := gml.FetchLabelIndex(svc)
+		if err != nil {
+			return fmt.Errorf("unable to fetch labels: %w", err)
+		}
+		if len(addLabels) > 0 {
+			ids, err := labelIndex.ResolveLabelIDs(addLabels)
+			if err != nil {
+				return fmt.Errorf("unable to resolve add labels: %w", err)
+			}
+			addLabelIDs = append(addLabelIDs, ids...)
+		}
+		if len(removeLabels) > 0 {
+			ids, err := labelIndex.ResolveLabelIDs(removeLabels)
+			if err != nil {
+				return fmt.Errorf("unable to resolve remove labels: %w", err)
+			}
+			removeLabelIDs = append(removeLabelIDs, ids...)
+		}
+	}
+
 	// Modify message
 	if err := gml.ModifyMessage(ctx, svc, messageID, addLabelIDs, removeLabelIDs); err != nil {
 		return fmt.Errorf("unable to modify message: %w", err)
@@ -103,6 +130,8 @@ func init() {
 	modifyCmd.Flags().Bool("unread", false, "Mark message as unread (adds UNREAD label)")
 	modifyCmd.Flags().Bool("archive", false, "Archive message (removes INBOX label)")
 	modifyCmd.Flags().Bool("unarchive", false, "Unarchive message (adds INBOX label)")
+	modifyCmd.Flags().StringSlice("add-label", nil, "Add label to message (can be specified multiple times)")
+	modifyCmd.Flags().StringSlice("remove-label", nil, "Remove label from message (can be specified multiple times)")
 
 	// Set custom output to enable testing
 	modifyCmd.SetOut(os.Stdout)
