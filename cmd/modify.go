@@ -40,8 +40,9 @@ Examples:
   gml modify 18abc123def456 --add-label MyLabel           # Add a custom label
   gml modify 18abc123def456 --remove-label MyLabel        # Remove a custom label
   gml modify 18abc123def456 --add-label Label1,Label2     # Add multiple labels`,
-	Args: cobra.ExactArgs(1),
-	RunE: runModify,
+	Annotations: map[string]string{"write": "true"},
+	Args:        cobra.ExactArgs(1),
+	RunE:        runModify,
 }
 
 func runModify(cmd *cobra.Command, args []string) error {

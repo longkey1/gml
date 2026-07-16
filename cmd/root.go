@@ -38,6 +38,13 @@ var rootCmd = &cobra.Command{
 	SilenceErrors: true,
 	// SilenceUsage prevents usage from being printed on every error
 	SilenceUsage: true,
+	// PersistentPreRunE blocks commands annotated as "write" when read-only mode is enabled
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		if config != nil && config.ReadOnly && cmd.Annotations["write"] == "true" {
+			return fmt.Errorf("write operation blocked: read-only mode is enabled")
+		}
+		return nil
+	},
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -53,6 +60,7 @@ func init() {
 	cobra.OnInitialize(initConfig)
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.config/gml/config.toml)")
+	rootCmd.PersistentFlags().Bool("read-only", false, "Disable write operations (e.g. modify)")
 }
 
 // initConfig reads in config file and ENV variables if set.
@@ -69,6 +77,11 @@ func initConfig() {
 	}
 
 	viper.AutomaticEnv()
+
+	// read_only is bound explicitly so it can be set via GML_READ_ONLY without
+	// exposing every other config key under an unprefixed env var of the same name.
+	_ = viper.BindPFlag("read_only", rootCmd.PersistentFlags().Lookup("read-only"))
+	_ = viper.BindEnv("read_only", "GML_READ_ONLY")
 
 	// Config file is optional for some commands (e.g., version)
 	if err := viper.ReadInConfig(); err != nil {

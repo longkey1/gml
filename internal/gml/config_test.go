@@ -89,6 +89,21 @@ unknown_key = "ignored"
 				GoogleUserCredentials:        "/path/to/token.json",
 			},
 		},
+		{
+			name: "read_only enabled",
+			content: `
+auth_type = "oauth"
+application_credentials = "/path/to/credentials.json"
+user_credentials = "/path/to/token.json"
+read_only = true
+`,
+			want: Config{
+				AuthType:                     AuthTypeOAuth,
+				GoogleApplicationCredentials: "/path/to/credentials.json",
+				GoogleUserCredentials:        "/path/to/token.json",
+				ReadOnly:                     true,
+			},
+		},
 	}
 
 	for _, tt := range tests {

@@ -121,6 +121,21 @@ gml modify <message-id> --read --add-label MyLabel
 
 > **Note:** The modify command requires the Gmail modify scope. If you previously authenticated with read-only scope, you need to re-authenticate by running `gml auth`.
 
+### Read-Only Mode
+
+Block write operations (currently `modify`) at the command level, before any Gmail API call is made. Useful when handing `gml` to an LLM or automated tool that should only read mail:
+
+```bash
+# Via flag
+gml modify <message-id> --read-only --read   # fails with "write operation blocked"
+
+# Via environment variable
+GML_READ_ONLY=true gml modify <message-id> --read
+
+# Via config file
+echo 'read_only = true' >> ~/.config/gml/config.toml
+```
+
 ### Version
 
 ```bash
@@ -134,6 +149,7 @@ gml version
 | `auth_type` | Authentication type: `oauth` or `service_account` |
 | `application_credentials` | Path to OAuth client credentials JSON file |
 | `user_credentials` | Path to store OAuth user token (for OAuth auth type) |
+| `read_only` | Block write operations (e.g. `modify`) when `true`. Also settable via `--read-only` flag or `GML_READ_ONLY` env var |
 
 ## License
 
