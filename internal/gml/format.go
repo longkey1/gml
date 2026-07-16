@@ -39,8 +39,8 @@ func formatMessagesJSON(w io.Writer, messages []MessageInfo) error {
 	if err != nil {
 		return fmt.Errorf("unable to marshal JSON: %w", err)
 	}
-	fmt.Fprintln(w, string(data))
-	return nil
+	_, err = fmt.Fprintln(w, string(data))
+	return err
 }
 
 // formatMessagesTable outputs messages as a table
@@ -84,16 +84,22 @@ func formatMessagesTable(w io.Writer, messages []MessageInfo, fields map[string]
 				row = append(row, truncate(msg.Snippet, 50))
 			}
 		}
-		table.Append(row)
+		if err := table.Append(row); err != nil {
+			return err
+		}
 	}
 
-	table.Render()
+	if err := table.Render(); err != nil {
+		return err
+	}
 
 	// Print body separately if requested
 	if fields["body"] {
 		for _, msg := range messages {
 			if msg.Body != "" {
-				fmt.Fprintf(w, "\n=== %s ===\n%s\n", msg.ID, msg.Body)
+				if _, err := fmt.Fprintf(w, "\n=== %s ===\n%s\n", msg.ID, msg.Body); err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -107,25 +113,28 @@ func formatDetailJSON(w io.Writer, detail *MessageDetail) error {
 	if err != nil {
 		return fmt.Errorf("unable to marshal JSON: %w", err)
 	}
-	fmt.Fprintln(w, string(data))
-	return nil
+	_, err = fmt.Fprintln(w, string(data))
+	return err
 }
 
 // formatDetailText outputs message detail as text
 func formatDetailText(w io.Writer, detail *MessageDetail) error {
-	fmt.Fprintf(w, "ID: %s\n", detail.ID)
-	fmt.Fprintf(w, "ThreadID: %s\n", detail.ThreadID)
-	fmt.Fprintf(w, "URL: %s\n", detail.URL)
-	fmt.Fprintf(w, "From: %s\n", detail.From)
-	fmt.Fprintf(w, "To: %s\n", detail.To)
-	fmt.Fprintf(w, "Subject: %s\n", detail.Subject)
-	fmt.Fprintf(w, "Date: %s\n", detail.Date)
-	if len(detail.Labels) > 0 {
-		fmt.Fprintf(w, "Labels: %s\n", strings.Join(detail.Labels, ", "))
+	lines := []string{
+		fmt.Sprintf("ID: %s", detail.ID),
+		fmt.Sprintf("ThreadID: %s", detail.ThreadID),
+		fmt.Sprintf("URL: %s", detail.URL),
+		fmt.Sprintf("From: %s", detail.From),
+		fmt.Sprintf("To: %s", detail.To),
+		fmt.Sprintf("Subject: %s", detail.Subject),
+		fmt.Sprintf("Date: %s", detail.Date),
 	}
-	fmt.Fprintln(w, "---")
-	fmt.Fprintln(w, detail.Body)
-	return nil
+	if len(detail.Labels) > 0 {
+		lines = append(lines, fmt.Sprintf("Labels: %s", strings.Join(detail.Labels, ", ")))
+	}
+	lines = append(lines, "---", detail.Body)
+
+	_, err := fmt.Fprintln(w, strings.Join(lines, "\n"))
+	return err
 }
 
 // truncate truncates a string to maxLen with ellipsis

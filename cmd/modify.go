@@ -119,7 +119,7 @@ func runModify(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("unable to modify message: %w", err)
 	}
 
-	fmt.Fprintln(cmd.OutOrStdout(), "Message modified successfully.")
+	_, _ = fmt.Fprintln(cmd.OutOrStdout(), "Message modified successfully.")
 	return nil
 }
 

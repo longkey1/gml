@@ -80,7 +80,7 @@ func runList(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(messages) == 0 {
-		fmt.Fprintln(cmd.OutOrStdout(), "No messages found.")
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "No messages found.")
 		return nil
 	}
 

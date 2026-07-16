@@ -16,6 +16,14 @@ make build
 
 ```
 
+### Linting
+
+```bash
+# Run golangci-lint (version managed by go.mod tool directive)
+make lint
+
+```
+
 ### Release Management
 
 The project uses GitHub Actions with GoReleaser for automated releases:
