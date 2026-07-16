@@ -63,7 +63,7 @@ gml list -l INBOX
 gml list -l INBOX -l UNREAD
 gml list -l "My Project"       # Custom labels resolved by name
 
-# Specify fields to include (available: id,from,to,subject,date,labels,snippet,body)
+# Specify fields to include (available: id,threadid,url,from,to,subject,date,labels,snippet,body)
 gml list -f id,from,subject,body
 
 # Output as JSON
