@@ -65,6 +65,67 @@ func TestParseFields(t *testing.T) {
 	}
 }
 
+func TestFieldsRequireGet(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		fields map[string]bool
+		want   bool
+	}{
+		{
+			name:   "id only",
+			fields: map[string]bool{"id": true},
+			want:   false,
+		},
+		{
+			name:   "id, threadid, and url",
+			fields: map[string]bool{"id": true, "threadid": true, "url": true},
+			want:   false,
+		},
+		{
+			name:   "subject requires get",
+			fields: map[string]bool{"id": true, "subject": true},
+			want:   true,
+		},
+		{
+			name:   "labels requires get",
+			fields: map[string]bool{"labels": true},
+			want:   true,
+		},
+		{
+			name:   "body requires get",
+			fields: map[string]bool{"id": true, "body": true},
+			want:   true,
+		},
+		{
+			name:   "snippet requires get",
+			fields: map[string]bool{"snippet": true},
+			want:   true,
+		},
+		{
+			name:   "false entries are ignored",
+			fields: map[string]bool{"id": true, "subject": false},
+			want:   false,
+		},
+		{
+			name:   "empty fields",
+			fields: map[string]bool{},
+			want:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := FieldsRequireGet(tt.fields); got != tt.want {
+				t.Errorf("FieldsRequireGet(%v) = %v, want %v", tt.fields, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestExtractBody(t *testing.T) {
 	t.Parallel()
 

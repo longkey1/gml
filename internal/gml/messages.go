@@ -5,9 +5,14 @@ import (
 	"encoding/base64"
 	"fmt"
 	"strings"
+	"sync"
 
 	"google.golang.org/api/gmail/v1"
 )
+
+// maxConcurrentFetches limits parallel Messages.Get calls to stay well
+// within the Gmail API per-user rate limit.
+const maxConcurrentFetches = 10
 
 // MessageInfo represents a simplified message for output
 type MessageInfo struct {
@@ -109,23 +114,49 @@ func ListMessages(ctx context.Context, svc *Service, opts ListMessagesOptions) (
 		return nil, nil
 	}
 
+	// The List response already contains Id and ThreadId, so skip the
+	// per-message Get calls when no other field is requested
+	if !FieldsRequireGet(opts.Fields) {
+		messages := make([]MessageInfo, 0, len(allMessages))
+		for _, m := range allMessages {
+			messages = append(messages, buildMessageInfo(m, opts.Fields, userEmail, labelsIndex))
+		}
+		return messages, nil
+	}
+
 	// Determine if we need full format (for body)
 	needsBody := opts.Fields["body"]
 
-	// Get message details
-	var messages []MessageInfo
-	for _, m := range allMessages {
-		var msg *gmail.Message
-		var err error
+	// Fetch message details in parallel, preserving list order
+	fetched := make([]*gmail.Message, len(allMessages))
+	sem := make(chan struct{}, maxConcurrentFetches)
+	var wg sync.WaitGroup
 
-		if needsBody {
-			msg, err = svc.Gmail.Users.Messages.Get("me", m.Id).Format("full").Context(ctx).Do()
-		} else {
-			msg, err = svc.Gmail.Users.Messages.Get("me", m.Id).Format("metadata").
-				MetadataHeaders("From", "To", "Subject", "Date").Context(ctx).Do()
-		}
-		if err != nil {
-			// Skip messages we can't retrieve instead of failing completely
+	for i, m := range allMessages {
+		wg.Go(func() {
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			var msg *gmail.Message
+			var err error
+			if needsBody {
+				msg, err = svc.Gmail.Users.Messages.Get("me", m.Id).Format("full").Context(ctx).Do()
+			} else {
+				msg, err = svc.Gmail.Users.Messages.Get("me", m.Id).Format("metadata").
+					MetadataHeaders("From", "To", "Subject", "Date").Context(ctx).Do()
+			}
+			if err != nil {
+				// Skip messages we can't retrieve instead of failing completely
+				return
+			}
+			fetched[i] = msg
+		})
+	}
+	wg.Wait()
+
+	var messages []MessageInfo
+	for _, msg := range fetched {
+		if msg == nil {
 			continue
 		}
 
@@ -139,6 +170,23 @@ func ListMessages(ctx context.Context, svc *Service, opts ListMessagesOptions) (
 	}
 
 	return messages, nil
+}
+
+// FieldsRequireGet reports whether any requested field needs a per-message
+// Messages.Get call. Id, ThreadId (and URL, derived from ThreadId) are
+// already present in the Messages.List response.
+func FieldsRequireGet(fields map[string]bool) bool {
+	for f, requested := range fields {
+		if !requested {
+			continue
+		}
+		switch f {
+		case "id", "threadid", "url":
+		default:
+			return true
+		}
+	}
+	return false
 }
 
 // GetMessage retrieves a single message by ID with full details
