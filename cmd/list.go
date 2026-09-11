@@ -79,13 +79,13 @@ func runList(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("unable to list messages: %w", err)
 	}
 
-	if len(messages) == 0 {
+	outputFormat := gml.OutputFormat(format)
+	if len(messages) == 0 && outputFormat != gml.OutputFormatJSON {
 		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "No messages found.")
 		return nil
 	}
 
 	// Output
-	outputFormat := gml.OutputFormat(format)
 	if err := gml.FormatMessageList(cmd.OutOrStdout(), messages, fields, outputFormat); err != nil {
 		return fmt.Errorf("unable to format output: %w", err)
 	}

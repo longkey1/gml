@@ -39,7 +39,7 @@ func TestFormatMessageListJSON(t *testing.T) {
 		{
 			name:     "nil messages",
 			messages: nil,
-			want:     "null\n",
+			want:     "[]\n",
 		},
 		{
 			name:     "empty slice",

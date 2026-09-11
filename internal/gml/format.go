@@ -35,6 +35,10 @@ func FormatMessageDetail(w io.Writer, detail *MessageDetail, format OutputFormat
 
 // formatMessagesJSON outputs messages as JSON
 func formatMessagesJSON(w io.Writer, messages []MessageInfo) error {
+	// A nil slice would marshal to "null"; callers piping into jq expect an array
+	if messages == nil {
+		messages = []MessageInfo{}
+	}
 	data, err := json.MarshalIndent(messages, "", "  ")
 	if err != nil {
 		return fmt.Errorf("unable to marshal JSON: %w", err)
